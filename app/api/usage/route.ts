@@ -7,6 +7,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const FREE_LIMIT = 3;
+const BETA_FREE_MODE = process.env.BETA_FREE_MODE === "true";
 
 function asDate(value: any): Date | null {
   if (!value) return null;
@@ -40,7 +41,7 @@ function normalizePlan(raw: any): PlanKey {
   return "free";
 }
 
-function displayPlan(plan: PlanKey): "Free" | "Starter" | "Pro" | "Business" {
+function displayPlan(plan: PlanKey | "beta"): "Free" | "Starter" | "Pro" | "Business" | "Beta" {
   switch (plan) {
     case "starter":
       return "Starter";
@@ -48,6 +49,8 @@ function displayPlan(plan: PlanKey): "Free" | "Starter" | "Pro" | "Business" {
       return "Pro";
     case "business":
       return "Business";
+    case "beta":
+      return "Beta";
     default:
       return "Free";
   }
@@ -56,11 +59,11 @@ function displayPlan(plan: PlanKey): "Free" | "Starter" | "Pro" | "Business" {
 function limitFor(plan: PlanKey): number | null {
   switch (plan) {
     case "free":
-      return FREE_LIMIT; // ✅ per month (UTC)
+      return FREE_LIMIT; // per month (UTC)
     case "starter":
-      return 20; // ✅ per billing cycle
+      return 20; // per billing cycle
     case "pro":
-      return 75; // ✅ per billing cycle
+      return 75; // per billing cycle
     case "business":
       return null; // unlimited
   }
@@ -82,6 +85,24 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // ✅ Beta mode: show unlimited free access and skip normal billing logic
+    if (BETA_FREE_MODE) {
+      return NextResponse.json({
+        plan: displayPlan("beta"),
+        used: 0,
+        remaining: null,
+        free_limit: FREE_LIMIT,
+        limit: null,
+        status: "beta",
+        isPaid: true,
+        cancel_at_period_end: false,
+        window_start: null,
+        window_end: null,
+        current_period_start: null,
+        current_period_end: null,
+      });
+    }
+
     // 1) Subscription snapshot (fail-open to Free)
     let planKey: PlanKey = "free";
     let status = "free";
@@ -89,8 +110,6 @@ export async function GET() {
 
     let periodStart: Date | null = null;
     let periodEnd: Date | null = null;
-
-    // ✅ NEW
     let cancelAtPeriodEnd = false;
 
     try {
@@ -108,7 +127,6 @@ export async function GET() {
         const rawStatus = String((sub as any).status ?? "").toLowerCase();
         const rawPlan = normalizePlan((sub as any).plan);
 
-        // ✅ NEW
         cancelAtPeriodEnd = Boolean((sub as any).cancel_at_period_end);
 
         periodStart = asDate((sub as any).current_period_start);
@@ -129,7 +147,7 @@ export async function GET() {
       isPaid = false;
       periodStart = null;
       periodEnd = null;
-      cancelAtPeriodEnd = false; // ✅ NEW
+      cancelAtPeriodEnd = false;
     }
 
     // 2) Decide counting window
@@ -187,24 +205,37 @@ export async function GET() {
     return NextResponse.json({
       plan: displayPlan(planKey),
       used,
-      remaining, // ✅ only null for Business
+      remaining,
       free_limit: FREE_LIMIT,
-      limit, // ✅ Starter=50, Pro=250, Business=null, Free=3
+      limit,
       status,
       isPaid,
-
-      // ✅ NEW: for Billing UI
       cancel_at_period_end: cancelAtPeriodEnd,
-
       window_start: windowStart ? windowStart.toISOString() : null,
       window_end: windowEnd ? windowEnd.toISOString() : null,
-
-      // still return these for debug/UI if you want them
       current_period_start: periodStart ? periodStart.toISOString() : null,
       current_period_end: periodEnd ? periodEnd.toISOString() : null,
     });
   } catch (err) {
     console.error("usage route failed (fail-open):", err);
+
+    if (BETA_FREE_MODE) {
+      return NextResponse.json({
+        plan: "Beta",
+        used: 0,
+        remaining: null,
+        free_limit: FREE_LIMIT,
+        limit: null,
+        status: "beta",
+        isPaid: true,
+        cancel_at_period_end: false,
+        window_start: null,
+        window_end: null,
+        current_period_start: null,
+        current_period_end: null,
+      });
+    }
+
     return NextResponse.json({
       plan: "Free",
       used: 0,
@@ -213,7 +244,7 @@ export async function GET() {
       limit: FREE_LIMIT,
       status: "unknown",
       isPaid: false,
-      cancel_at_period_end: false, // ✅ NEW
+      cancel_at_period_end: false,
       window_start: null,
       window_end: null,
       current_period_start: null,

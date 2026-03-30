@@ -7,23 +7,25 @@ import { usePathname, useRouter } from "next/navigation";
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/browser";
 
+const BETA_FREE_MODE = process.env.NEXT_PUBLIC_BETA_FREE_MODE === "true";
+
 type Usage = {
-  plan: "Free" | "Pro" | string;
+  plan: "Free" | "Pro" | "Beta" | string;
   used: number;
   remaining: number | null;
   free_limit: number;
 
   // optional fields some endpoints may return
-  limit?: number | null; // ✅ allow null (unlimited)
+  limit?: number | null;
   status?: string;
   isPaid?: boolean;
 
-  // ✅ subscription + billing fields for Billing page UX
+  // subscription + billing fields for Billing page UX
   cancel_at_period_end?: boolean;
   current_period_start?: string | null;
   current_period_end?: string | null;
 
-  // ✅ usage window fields (free month / paid billing cycle)
+  // usage window fields (free month / paid billing cycle)
   window_start?: string | null;
   window_end?: string | null;
 };
@@ -31,8 +33,8 @@ type Usage = {
 type AppShellCtx = {
   usage: Usage | null;
   usageLoading: boolean;
-  isPro: boolean; // NOTE: kept name for minimal refactor; now means "paid (starter/pro/business)"
-  isUnlimited: boolean; // ✅ new
+  isPro: boolean; // kept name for minimal refactor; in beta this is also true-ish behaviorally
+  isUnlimited: boolean;
   refreshUsage: () => Promise<void>;
   startCheckout: (priceKey?: "starter" | "pro" | "business") => Promise<void>;
   logout: () => Promise<void>;
@@ -56,16 +58,18 @@ const NAV: NavItem[] = [
 ];
 
 const FALLBACK_FREE: Usage = {
-  plan: "Free",
+  plan: BETA_FREE_MODE ? "Beta" : "Free",
   used: 0,
-  remaining: 3,
+  remaining: BETA_FREE_MODE ? null : 3,
   free_limit: 3,
-  limit: 3,
+  limit: BETA_FREE_MODE ? null : 3,
   cancel_at_period_end: false,
   current_period_start: null,
   current_period_end: null,
   window_start: null,
   window_end: null,
+  status: BETA_FREE_MODE ? "beta" : "free",
+  isPaid: BETA_FREE_MODE ? true : false,
 };
 
 function normalizeUsage(input: unknown): Usage {
@@ -73,7 +77,7 @@ function normalizeUsage(input: unknown): Usage {
 
   const obj = input as Record<string, unknown>;
 
-  const plan = String(obj.plan ?? "Free");
+  const plan = String(obj.plan ?? (BETA_FREE_MODE ? "Beta" : "Free"));
 
   const limit = obj.limit === null ? null : typeof obj.limit === "number" ? obj.limit : undefined;
 
@@ -87,8 +91,7 @@ function normalizeUsage(input: unknown): Usage {
       ? null
       : typeof obj.remaining === "number"
       ? obj.remaining
-      : // If limit is null => unlimited
-      limit === null
+      : limit === null
       ? null
       : Math.max(0, free_limit - used);
 
@@ -100,16 +103,12 @@ function normalizeUsage(input: unknown): Usage {
     limit,
     status: typeof obj.status === "string" ? obj.status : undefined,
     isPaid: typeof obj.isPaid === "boolean" ? obj.isPaid : undefined,
-
-    // ✅ Billing fields
     cancel_at_period_end:
       typeof obj.cancel_at_period_end === "boolean" ? obj.cancel_at_period_end : undefined,
     current_period_start:
       typeof obj.current_period_start === "string" ? obj.current_period_start : null,
     current_period_end:
       typeof obj.current_period_end === "string" ? obj.current_period_end : null,
-
-    // ✅ Window fields
     window_start: typeof obj.window_start === "string" ? obj.window_start : null,
     window_end: typeof obj.window_end === "string" ? obj.window_end : null,
   };
@@ -120,11 +119,10 @@ function isPriceKey(x: string | null): x is PriceKey {
   return x === "starter" || x === "pro" || x === "business";
 }
 
-function BrandMark({ size = 36 }: { size?: number }) {
-  // Uses public-root icons: /icon-light.png and /icon-dark.png
+function BrandMark({ size = 40 }: { size?: number }) {
   return (
     <span
-      className="inline-flex items-center justify-center overflow-hidden rounded-xl"
+      className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-2xl ring-1 ring-black/5"
       style={{ width: size, height: size }}
       aria-hidden="true"
     >
@@ -133,18 +131,18 @@ function BrandMark({ size = 36 }: { size?: number }) {
         alt=""
         width={size}
         height={size}
-        unoptimized
         priority
-        className="block h-full w-full object-contain dark:hidden"
+        className="block h-full w-full object-cover dark:hidden"
+        sizes={`${size}px`}
       />
       <Image
         src="/icon-dark.png"
         alt=""
         width={size}
         height={size}
-        unoptimized
         priority
-        className="hidden h-full w-full object-contain dark:block"
+        className="hidden h-full w-full object-cover dark:block"
+        sizes={`${size}px`}
       />
     </span>
   );
@@ -203,23 +201,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const normalizedPlan = String(usage?.plan || "Free").toLowerCase();
+  const normalizedPlan = String(usage?.plan || (BETA_FREE_MODE ? "Beta" : "Free")).toLowerCase();
 
-  // ✅ Paid flag (keep name isPro for minimal changes elsewhere)
-  // Treat starter/pro/business as paid; free as not paid.
   const isPaidPlan = ["starter", "pro", "business"].includes(normalizedPlan);
+  const isBetaPlan = normalizedPlan === "beta";
 
-  // Some endpoints may return isPaid/status; prefer them if present.
   const explicitIsPaid =
     usage?.isPaid === true ||
     (typeof usage?.status === "string" && ["active", "trialing"].includes(usage.status.toLowerCase()));
 
-  const isPro = explicitIsPaid || isPaidPlan;
+  const isPro = BETA_FREE_MODE || isBetaPlan || explicitIsPaid || isPaidPlan;
 
-  // ✅ Unlimited only when backend signals it:
-  // - limit === null (ideal)
-  // - remaining === null (back-compat)
-  const isUnlimited = usage?.limit === null || usage?.remaining === null;
+  const isUnlimited = BETA_FREE_MODE || usage?.limit === null || usage?.remaining === null;
 
   const activeHref = useMemo(() => {
     const exact = NAV.find((n) => n.href === pathname)?.href;
@@ -236,6 +229,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   const startCheckout = async (priceKey: "starter" | "pro" | "business" = "pro") => {
+    if (BETA_FREE_MODE) return;
     if (checkoutStartedRef.current) return;
     checkoutStartedRef.current = true;
 
@@ -273,22 +267,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // ✅ Auto-start checkout when user lands on /app with ?plan=starter|pro|business
   useEffect(() => {
+    if (BETA_FREE_MODE) return;
     if (typeof window === "undefined") return;
 
     const sp = new URLSearchParams(window.location.search);
     const plan = sp.get("plan");
 
-    // Only kick off checkout if plan is valid and user isn't already paid
     if (!isPro && isPriceKey(plan)) {
       sp.delete("plan");
       const nextUrl =
         window.location.pathname + (sp.toString() ? `?${sp.toString()}` : "") + window.location.hash;
 
       window.history.replaceState({}, "", nextUrl);
-
-      // Start checkout once
       startCheckout(plan);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -316,23 +307,27 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       : "Dashboard";
 
   const showUsage = !!usage && !usageLoading;
-
-  // ✅ Show usage counts for any NON-unlimited plan (free/starter/pro)
   const showMeter = showUsage && !isUnlimited && usage?.remaining !== null;
+
+  const planBadgeClass = isBetaPlan || BETA_FREE_MODE
+    ? "border-blue-200 bg-blue-50 text-blue-800"
+    : isPro
+    ? "border-green-200 bg-green-50 text-green-800"
+    : "border-yellow-200 bg-yellow-50 text-yellow-800";
+
+  const planLabel = BETA_FREE_MODE ? "Free Beta" : String(usage?.plan || "Free");
 
   return (
     <Ctx.Provider value={ctxValue}>
       <div className="min-h-screen bg-white text-gray-900">
         <div className="flex min-h-screen">
-          {/* Sidebar */}
           <aside className="hidden w-64 border-r border-gray-200 bg-white md:flex md:flex-col">
-            {/* Brand */}
             <div className="px-6 py-5">
               <Link
                 href="/"
                 className="flex items-center gap-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-300"
               >
-                <BrandMark size={40} />
+                <BrandMark size={44} />
                 <div className="min-w-0">
                   <div className="text-sm font-semibold tracking-tight hover:opacity-90">Convert My Email</div>
                   <div className="mt-1 text-xs text-gray-500">Professional conversions</div>
@@ -364,17 +359,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </aside>
 
-          {/* Main */}
           <div className="flex-1">
-            {/* Topbar */}
             <header className="sticky top-0 z-10 border-b border-gray-200 bg-white/80 backdrop-blur">
               <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-3">
-                    {/* Mobile brand mark (shows even when sidebar hidden) */}
                     <div className="md:hidden">
                       <Link href="/" className="inline-flex items-center gap-2">
-                        <BrandMark size={28} />
+                        <BrandMark size={32} />
                       </Link>
                     </div>
 
@@ -384,11 +376,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                       <span
                         className={[
                           "inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold border",
-                          isPro ? "border-green-200 bg-green-50 text-green-800" : "border-yellow-200 bg-yellow-50 text-yellow-800",
+                          planBadgeClass,
                         ].join(" ")}
                         title="Your current plan"
                       >
-                        {String(usage?.plan || "Free")}
+                        {planLabel}
                       </span>
                     )}
 
@@ -398,7 +390,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                       </span>
                     )}
 
-                    {showUsage && isUnlimited && <span className="text-xs text-gray-500">Unlimited conversions</span>}
+                    {showUsage && isUnlimited && (
+                      <span className="text-xs text-gray-500">
+                        {BETA_FREE_MODE ? "Unlimited conversions during beta" : "Unlimited conversions"}
+                      </span>
+                    )}
                   </div>
 
                   <div className="mt-1 truncate text-xs text-gray-500">
@@ -421,14 +417,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     How it works
                   </Link>
 
-                  <Link
-                    href="/pricing"
-                    className="hidden sm:inline-flex rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-medium hover:bg-gray-50"
-                  >
-                    Pricing
-                  </Link>
+                  {!BETA_FREE_MODE && (
+                    <Link
+                      href="/pricing"
+                      className="hidden sm:inline-flex rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-medium hover:bg-gray-50"
+                    >
+                      Pricing
+                    </Link>
+                  )}
 
-                  {!isPro && (
+                  {!BETA_FREE_MODE && !isPro && (
                     <button
                       className="hidden sm:inline-flex rounded-xl bg-gray-900 px-3 py-2 text-sm font-semibold text-white hover:bg-black"
                       onClick={() => startCheckout("pro")}
@@ -448,7 +446,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
 
-              {/* Mobile nav */}
+              {BETA_FREE_MODE && (
+                <div className="border-t border-gray-200 bg-blue-50/70">
+                  <div className="mx-auto max-w-6xl px-6 py-3 text-sm text-blue-900">
+                    Free during beta — unlimited conversions for now. We’d love your feedback.
+                  </div>
+                </div>
+              )}
+
               <div className="border-t border-gray-200 md:hidden">
                 <div className="mx-auto flex max-w-6xl gap-2 overflow-x-auto px-4 py-2">
                   {NAV.map((item) => (

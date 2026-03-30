@@ -8,6 +8,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const BUCKET = "conversions";
+const BETA_FREE_MODE = process.env.BETA_FREE_MODE === "true";
 
 // ✅ Step 1D: UTC monthly window helper (for monthly free reset)
 function getUtcMonthWindow(d = new Date()) {
@@ -118,6 +119,19 @@ async function getSubscriptionSnapshot(supabase: SupabaseClient, userId: string)
  * We count "conversions" rows as the unit of usage.
  */
 async function enforceUsageLimit(supabase: SupabaseClient, userId: string) {
+  if (BETA_FREE_MODE) {
+    return {
+      ok: true as const,
+      plan: "business" as Plan,
+      limit: null,
+      used: null,
+      remaining: null,
+      window: "unlimited" as const,
+      window_start: null as string | null,
+      window_end: null as string | null,
+    };
+  }
+
   const snap = await getSubscriptionSnapshot(supabase, userId);
 
   const status = String(snap.status || "").toLowerCase();
