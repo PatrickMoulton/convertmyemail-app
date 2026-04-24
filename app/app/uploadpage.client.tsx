@@ -13,7 +13,7 @@ type Conversion = {
   xlsx_path: string | null;
   csv_path: string | null;
   pdf_path: string | null;
-  sheet_path: string | null; // preferred xlsx, fallback csv
+  sheet_path: string | null;
   message_count?: number | null;
 };
 
@@ -44,6 +44,15 @@ type LimitModalState = {
 
 type CheckoutPlan = "starter" | "pro" | "business";
 
+const fallbackUsage: UsageInfo = {
+  plan: "Free",
+  isPaid: false,
+  used: 0,
+  remaining: FREE_LIMIT_FALLBACK,
+  limit: FREE_LIMIT_FALLBACK,
+  status: "free",
+};
+
 function asRecord(v: unknown): Record<string, unknown> | null {
   return v && typeof v === "object" ? (v as Record<string, unknown>) : null;
 }
@@ -64,17 +73,14 @@ function cn(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
 }
 
-export default function UploadPageClient({ usage }: { usage: UsageInfo }) {
+export default function UploadPageClient({ usage }: { usage?: UsageInfo }) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // App shell (client-side usage + checkout helpers)
   const { usage: shellUsage, usageLoading, isPro, refreshUsage, startCheckout } = useAppShell();
 
-  // Prefer freshest usage from shell once it loads; fallback to server-passed usage
-  const effectiveUsage = (shellUsage ?? usage) as unknown;
+  const effectiveUsage = (shellUsage ?? usage ?? fallbackUsage) as unknown;
   const usageObj = asRecord(effectiveUsage);
 
-  // Normalize usage fields (app shell type vs server type)
   const usageUsed =
     readNumber(usageObj, "used") ??
     readNumber(usageObj, "usage_used") ??
@@ -98,7 +104,6 @@ export default function UploadPageClient({ usage }: { usage: UsageInfo }) {
   const [files, setFiles] = useState<FileList | null>(null);
   const [status, setStatus] = useState<string>("");
 
-  // Upgrade modal
   const [limitModal, setLimitModal] = useState<LimitModalState>({ open: false });
   const [loadingPlan, setLoadingPlan] = useState<CheckoutPlan | null>(null);
 
@@ -122,13 +127,11 @@ export default function UploadPageClient({ usage }: { usage: UsageInfo }) {
     try {
       setLoadingPlan(plan);
       await Promise.resolve(startCheckout(plan));
-      // If startCheckout redirects, code may never reach here — that’s OK.
     } catch {
       setLoadingPlan(null);
     }
   };
 
-  // History
   const [history, setHistory] = useState<Conversion[]>([]);
   const [historyLoading, setHistoryLoading] = useState<boolean>(true);
   const [historyError, setHistoryError] = useState<string>("");
@@ -152,6 +155,7 @@ export default function UploadPageClient({ usage }: { usage: UsageInfo }) {
       const j = asRecord(json);
       const conversions =
         j && Array.isArray(j["conversions"]) ? (j["conversions"] as Conversion[]) : [];
+
       setHistory(conversions);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to load history";
@@ -161,7 +165,6 @@ export default function UploadPageClient({ usage }: { usage: UsageInfo }) {
     }
   };
 
-  // ✅ Download without leaving the site (same-origin blob)
   const downloadConversionFile = async (id: string, kind: "pdf" | "sheet" | "xlsx" | "csv") => {
     const key = `${id}:${kind}`;
     setDownloadingKey(key);
@@ -187,8 +190,8 @@ export default function UploadPageClient({ usage }: { usage: UsageInfo }) {
         (kind === "pdf"
           ? "email-records.pdf"
           : kind === "csv"
-          ? "converted-emails.csv"
-          : "converted-emails.xlsx");
+            ? "converted-emails.csv"
+            : "converted-emails.xlsx");
 
       const blob = await res.blob();
       const objectUrl = window.URL.createObjectURL(blob);
@@ -210,12 +213,10 @@ export default function UploadPageClient({ usage }: { usage: UsageInfo }) {
     }
   };
 
-  // Load history on mount
   useEffect(() => {
     loadHistory();
   }, []);
 
-  // Auto-start checkout on /app?plan=starter|pro|business (deep-link)
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
     const planKey = (sp.get("plan") || "").trim().toLowerCase();
@@ -224,11 +225,11 @@ export default function UploadPageClient({ usage }: { usage: UsageInfo }) {
     startCheckout(planKey as CheckoutPlan);
   }, [startCheckout]);
 
-  // Close modal with Escape
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") closeLimitModal();
     };
+
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
@@ -272,23 +273,20 @@ export default function UploadPageClient({ usage }: { usage: UsageInfo }) {
 
         const code = readString(j, "code") ?? "";
         const errStr = readString(j, "error") ?? "";
-        const messageStr = readString(j, "message") ?? "";
 
-        // 402 + FREE_LIMIT_REACHED / LIMIT_REACHED => open modal
         const isLimit =
           res.status === 402 &&
           (code === "FREE_LIMIT_REACHED" || code === "LIMIT_REACHED" || /limit/i.test(errStr));
 
         if (isLimit) {
           usedFromServer = readNumber(j, "used") ?? undefined;
-
           limitFromServer = readNumber(j, "free_limit") ?? readNumber(j, "limit") ?? undefined;
 
-          // ✅ Force our desired copy on limit reached (don’t rely on server message)
           openLimitModal({
             used: usedFromServer,
             limit: limitFromServer,
-            message: "You've used your 3 free conversions.\nUpgrade to Starter to convert 20 emails per month.",
+            message:
+              "You've used your 3 free conversions.\nUpgrade to Starter to convert 20 emails per month.",
           });
 
           msg =
@@ -314,12 +312,15 @@ export default function UploadPageClient({ usage }: { usage: UsageInfo }) {
 
     const blob = await res.blob();
     const url = window.URL.createObjectURL(blob);
+
     const a = document.createElement("a");
     a.href = url;
     a.download = format === "pdf" ? "email-records.pdf" : "converted-emails.xlsx";
+
     document.body.appendChild(a);
     a.click();
     a.remove();
+
     window.URL.revokeObjectURL(url);
 
     setStatus(`Done. Converted ${files.length} file(s).`);
@@ -328,14 +329,10 @@ export default function UploadPageClient({ usage }: { usage: UsageInfo }) {
   };
 
   const showUsage = !!effectiveUsage && !usageLoading;
-
-  // ✅ Only treat as “limit hit” when there is a numeric remaining and it’s <= 0
-  // (Paid plans have remaining=null; those should NEVER be blocked by this check.)
   const limitHit = typeof usageRemaining === "number" && usageRemaining <= 0;
 
   return (
     <>
-      {/* Upgrade Modal (3-tier) */}
       {limitModal.open && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -369,7 +366,6 @@ export default function UploadPageClient({ usage }: { usage: UsageInfo }) {
               </button>
             </div>
 
-            {/* Usage pill */}
             <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
               <div className="flex items-center justify-between gap-3 text-sm text-gray-700">
                 <span className="font-medium">This month</span>
@@ -386,12 +382,12 @@ export default function UploadPageClient({ usage }: { usage: UsageInfo }) {
                     width: `${Math.min(
                       100,
                       Math.round(
-                        ((Number(typeof limitModal.used === "number" ? limitModal.used : usageUsed) /
+                        (Number(typeof limitModal.used === "number" ? limitModal.used : usageUsed) /
                           Math.max(
                             1,
                             Number(typeof limitModal.limit === "number" ? limitModal.limit : usageLimit)
                           )) *
-                          100)
+                          100
                       )
                     )}%`,
                   }}
@@ -399,9 +395,7 @@ export default function UploadPageClient({ usage }: { usage: UsageInfo }) {
               </div>
             </div>
 
-            {/* Plan selector */}
             <div className="mt-5 grid gap-3">
-              {/* Starter */}
               <div className="rounded-2xl border border-gray-200 bg-white p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -429,7 +423,6 @@ export default function UploadPageClient({ usage }: { usage: UsageInfo }) {
                 </button>
               </div>
 
-              {/* Pro (Most popular) */}
               <div className="rounded-2xl border border-gray-900 bg-gray-900/5 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -462,7 +455,6 @@ export default function UploadPageClient({ usage }: { usage: UsageInfo }) {
                 </button>
               </div>
 
-              {/* Business */}
               <div className="rounded-2xl border border-gray-200 bg-white p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -491,13 +483,8 @@ export default function UploadPageClient({ usage }: { usage: UsageInfo }) {
               </div>
             </div>
 
-            {/* De-emphasized close */}
             <div className="mt-5 text-center">
-              <button
-                className="text-sm text-gray-500 hover:text-gray-700"
-                onClick={closeLimitModal}
-                type="button"
-              >
+              <button className="text-sm text-gray-500 hover:text-gray-700" onClick={closeLimitModal} type="button">
                 Not now
               </button>
             </div>
@@ -505,7 +492,6 @@ export default function UploadPageClient({ usage }: { usage: UsageInfo }) {
         </div>
       )}
 
-      {/* Upload card */}
       <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
@@ -530,8 +516,8 @@ export default function UploadPageClient({ usage }: { usage: UsageInfo }) {
             </div>
 
             <p className="mt-1 text-sm text-gray-600">
-              Select one or more <span className="font-medium">.eml</span> files. We’ll extract
-              structured fields and generate downloadable records.
+              Select one or more <span className="font-medium">.eml</span> files. We’ll extract structured fields and
+              generate downloadable records.
             </p>
           </div>
 
@@ -544,7 +530,6 @@ export default function UploadPageClient({ usage }: { usage: UsageInfo }) {
               Choose files
             </button>
 
-            {/* Convert to Excel */}
             <button
               className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-black disabled:opacity-50"
               onClick={() => {
@@ -561,7 +546,6 @@ export default function UploadPageClient({ usage }: { usage: UsageInfo }) {
               Convert to Excel
             </button>
 
-            {/* Convert to PDF */}
             <button
               className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-black disabled:opacity-50"
               onClick={() => {
@@ -580,7 +564,6 @@ export default function UploadPageClient({ usage }: { usage: UsageInfo }) {
           </div>
         </div>
 
-        {/* ✅ Improved dashboard upsell messaging (exact copy requested) */}
         {!isPro && showUsage && usageRemaining !== null && (
           <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -637,7 +620,6 @@ export default function UploadPageClient({ usage }: { usage: UsageInfo }) {
           onChange={(e) => setFiles(e.target.files)}
         />
 
-        {/* Selected files */}
         <div className="mt-5 rounded-2xl border border-gray-200 bg-gray-50 p-4">
           {!files || files.length === 0 ? (
             <div className="flex flex-col gap-1">
@@ -650,11 +632,7 @@ export default function UploadPageClient({ usage }: { usage: UsageInfo }) {
             <>
               <div className="flex items-center justify-between">
                 <div className="text-sm font-medium text-gray-900">{files.length} file(s) selected</div>
-                <button
-                  className="text-sm font-medium text-gray-700 hover:text-gray-900"
-                  onClick={() => setFiles(null)}
-                  type="button"
-                >
+                <button className="text-sm font-medium text-gray-700 hover:text-gray-900" onClick={() => setFiles(null)} type="button">
                   Clear
                 </button>
               </div>
@@ -704,7 +682,6 @@ export default function UploadPageClient({ usage }: { usage: UsageInfo }) {
         </p>
       </section>
 
-      {/* History */}
       <section className="mt-8 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -745,6 +722,7 @@ export default function UploadPageClient({ usage }: { usage: UsageInfo }) {
                   <th className="py-3 text-right font-medium">Download</th>
                 </tr>
               </thead>
+
               <tbody className="divide-y divide-gray-100">
                 {history.map((c) => {
                   const sheetKey = `${c.id}:sheet`;
@@ -782,11 +760,13 @@ export default function UploadPageClient({ usage }: { usage: UsageInfo }) {
                               XLSX
                             </span>
                           )}
+
                           {!c.xlsx_path && c.csv_path && (
                             <span className="inline-flex rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700">
                               CSV
                             </span>
                           )}
+
                           {c.pdf_path && (
                             <span className="inline-flex rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700">
                               PDF
