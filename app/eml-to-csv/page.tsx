@@ -1,5 +1,4 @@
 import Link from "next/link";
-import UploadPage from "../app/uploadpage.client";
 
 export const metadata = {
   title: "Convert EML to CSV Online | Email to CSV Converter",
@@ -43,13 +42,19 @@ export default function EmlToCsvPage() {
             </div>
           </div>
 
-          <div className="rounded-3xl bg-white p-5 shadow-xl ring-1 ring-slate-200">
-            <h2 className="mb-2 text-xl font-bold">Upload your EML file</h2>
+          <div className="rounded-3xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
+            <h2 className="mb-2 text-xl font-bold">Convert your EML file</h2>
             <p className="mb-5 text-sm text-slate-600">
-              Convert your email file directly on this page.
+              Use the converter to upload your email file and download a clean
+              CSV-style export.
             </p>
 
-            <UploadPage />
+            <Link
+              href="/eml-to-pdf"
+              className="inline-flex rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-black"
+            >
+              Open EML converter
+            </Link>
           </div>
         </div>
       </section>
@@ -78,7 +83,7 @@ export default function EmlToCsvPage() {
 
             <ol className="mt-6 space-y-4 text-slate-700">
               <Step number="1" text="Export or save your email as a .eml file." />
-              <Step number="2" text="Upload the EML file using the converter above." />
+              <Step number="2" text="Upload the EML file using the converter." />
               <Step number="3" text="Convert the email into structured data." />
               <Step number="4" text="Download the CSV file." />
             </ol>
