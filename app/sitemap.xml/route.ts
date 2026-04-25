@@ -9,19 +9,23 @@ export async function GET() {
     "/how-to-save-eml",
   ];
 
-  // SEO pages (THIS is what we’re adding)
+  // ONLY pages that actually exist in page.tsx
   const emlSlugs = [
     "eml-to-pdf",
     "eml-to-excel",
+    "eml-to-csv",
+    "outlook-eml-to-pdf",
+    "email-to-pdf",
+    "convert-eml-to-pdf",
+    "save-eml-as-pdf",
     "open-eml-file",
-    "eml-to-pdf-mac",
-    "eml-to-pdf-windows",
     "eml-viewer",
   ];
 
-  const emlUrls = emlSlugs.map((slug) => `/eml/${slug}`);
-
-  const allUrls = [...staticUrls, ...emlUrls];
+  const allUrls = [
+    ...staticUrls,
+    ...emlSlugs.map((slug) => `/eml/${slug}`),
+  ];
 
   const body = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -29,6 +33,7 @@ ${allUrls
   .map(
     (path) => `  <url>
     <loc>${baseUrl}${path}</loc>
+    <lastmod>${new Date().toISOString()}</lastmod>
   </url>`
   )
   .join("\n")}
