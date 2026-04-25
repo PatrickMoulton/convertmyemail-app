@@ -305,6 +305,67 @@ const pages: Record<string, SeoPage> = {
     description: "Open EML files instantly online.",
     h1: "EML file opener",
   },
+
+  "convert-email-evidence-to-pdf": {
+    title: "Convert Email Evidence to PDF",
+    description:
+      "Convert email evidence into clean PDF files for records, disputes, legal matters, and documentation.",
+    h1: "Convert email evidence to PDF",
+  },
+  "export-email-for-legal-records": {
+    title: "Export Email for Legal Records",
+    description:
+      "Export emails into readable PDF files for legal records, case files, and documentation.",
+    h1: "Export email for legal records",
+  },
+  "convert-forwarded-email-to-pdf": {
+    title: "Convert Forwarded Email to PDF",
+    description:
+      "Convert forwarded email messages into clean PDF documents that are easier to save, print, and share.",
+    h1: "Convert forwarded email to PDF",
+  },
+  "convert-email-chain-to-pdf": {
+    title: "Convert Email Chain to PDF",
+    description:
+      "Convert long email chains into readable PDF files for documentation, records, and review.",
+    h1: "Convert email chain to PDF",
+  },
+  "email-record-export": {
+    title: "Email Record Export Tool",
+    description:
+      "Export email records into clean PDF or Excel files for storage, review, and documentation.",
+    h1: "Email record export tool",
+  },
+  "convert-customer-emails-to-excel": {
+    title: "Convert Customer Emails to Excel",
+    description:
+      "Convert customer email files into structured Excel spreadsheets for sorting, tracking, and analysis.",
+    h1: "Convert customer emails to Excel",
+  },
+  "extract-email-subjects-to-excel": {
+    title: "Extract Email Subjects to Excel",
+    description:
+      "Extract email subjects, senders, dates, and message content into a clean Excel spreadsheet.",
+    h1: "Extract email subjects to Excel",
+  },
+  "email-documentation-tool": {
+    title: "Email Documentation Tool",
+    description:
+      "Turn email files into organized documentation with clean PDF and Excel exports.",
+    h1: "Email documentation tool",
+  },
+  "convert-business-emails-to-pdf": {
+    title: "Convert Business Emails to PDF",
+    description:
+      "Convert business email files into professional PDF records for sharing, storage, and review.",
+    h1: "Convert business emails to PDF",
+  },
+  "email-backup-to-pdf": {
+    title: "Email Backup to PDF",
+    description:
+      "Convert backed-up email files into readable PDF documents for long-term storage.",
+    h1: "Email backup to PDF",
+  },
 };
 
 type PageProps = {

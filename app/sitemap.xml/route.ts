@@ -69,6 +69,16 @@ export async function GET() {
     "eml-to-pdf-best",
     "best-eml-viewer",
     "eml-file-opener",
+    "convert-email-evidence-to-pdf",
+"export-email-for-legal-records",
+"convert-forwarded-email-to-pdf",
+"convert-email-chain-to-pdf",
+"email-record-export",
+"convert-customer-emails-to-excel",
+"extract-email-subjects-to-excel",
+"email-documentation-tool",
+"convert-business-emails-to-pdf",
+"email-backup-to-pdf",
   ];
 
   const allUrls = [
