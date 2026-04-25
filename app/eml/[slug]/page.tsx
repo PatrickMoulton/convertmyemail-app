@@ -1,11 +1,19 @@
 import { notFound } from "next/navigation";
 import PublicUploader from "../../components/public-uploader.client";
 
+/* ========================= */
+/* TYPES */
+/* ========================= */
+
 type SeoPage = {
   title: string;
   description: string;
   h1: string;
 };
+
+/* ========================= */
+/* PAGE CONFIG */
+/* ========================= */
 
 const pages: Record<string, SeoPage> = {
   "eml-to-pdf": {
@@ -28,7 +36,8 @@ const pages: Record<string, SeoPage> = {
   },
   "outlook-eml-to-pdf": {
     title: "Convert Outlook EML to PDF",
-    description: "Convert Outlook .eml files into clean PDF records instantly.",
+    description:
+      "Convert Outlook .eml files into clean PDF records instantly.",
     h1: "Convert Outlook EML to PDF",
   },
   "email-to-pdf": {
@@ -45,7 +54,8 @@ const pages: Record<string, SeoPage> = {
   },
   "save-eml-as-pdf": {
     title: "Save EML as PDF",
-    description: "Save .eml email files as PDF documents quickly and easily.",
+    description:
+      "Save .eml email files as PDF documents quickly and easily.",
     h1: "Save EML files as PDF",
   },
   "open-eml-file": {
@@ -60,21 +70,46 @@ const pages: Record<string, SeoPage> = {
       "View and convert .eml email files online without installing Outlook or Thunderbird.",
     h1: "EML viewer online",
   },
+
+  /* 🔥 NEW SEO PAGES */
+
+  "eml-to-pdf-mac": {
+    title: "Convert EML to PDF on Mac",
+    description: "Convert .eml files to PDF on macOS instantly.",
+    h1: "Convert EML to PDF on Mac",
+  },
+  "eml-to-pdf-windows": {
+    title: "Convert EML to PDF on Windows",
+    description: "Convert .eml files to PDF on Windows instantly.",
+    h1: "Convert EML to PDF on Windows",
+  },
+  "eml-to-pdf-online-free": {
+    title: "Convert EML to PDF Online Free",
+    description: "Free online EML to PDF converter.",
+    h1: "Convert EML to PDF online for free",
+  },
+  "how-to-open-eml-without-outlook": {
+    title: "Open EML Without Outlook",
+    description: "Open EML files without installing Outlook.",
+    h1: "How to open EML without Outlook",
+  },
+  "eml-file-viewer-online": {
+    title: "EML File Viewer Online",
+    description: "View EML files instantly online.",
+    h1: "EML file viewer",
+  },
 };
 
-type PageProps = {
-  params: Promise<{
-    slug: string;
-  }>;
-};
+/* ========================= */
+/* STATIC GENERATION */
+/* ========================= */
 
 export function generateStaticParams() {
   return Object.keys(pages).map((slug) => ({ slug }));
 }
 
-export async function generateMetadata({ params }: PageProps) {
-  const { slug } = await params;
-  const page = pages[slug];
+export function generateMetadata({ params }: { params: { slug: string } }) {
+  const page = pages[params.slug];
 
   if (!page) return {};
 
@@ -84,11 +119,14 @@ export async function generateMetadata({ params }: PageProps) {
   };
 }
 
-export default async function Page({ params }: PageProps) {
-  const { slug } = await params;
-  const page = pages[slug];
+/* ========================= */
+/* PAGE */
+/* ========================= */
 
-  if (!page) notFound();
+export default function Page({ params }: { params: { slug: string } }) {
+  const page = pages[params.slug];
+
+  if (!page) return notFound();
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
@@ -116,8 +154,11 @@ export default async function Page({ params }: PageProps) {
             </div>
           </div>
 
+          {/* 🔥 CONVERTER */}
           <div className="rounded-3xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
-            <h2 className="mb-2 text-xl font-bold">Upload your EML file</h2>
+            <h2 className="mb-2 text-xl font-bold">
+              Upload your EML file
+            </h2>
             <p className="mb-5 text-sm text-slate-600">
               Convert your email file directly on this page.
             </p>
@@ -125,6 +166,17 @@ export default async function Page({ params }: PageProps) {
             <PublicUploader />
           </div>
         </div>
+
+        {/* 🔗 INTERNAL LINKS */}
+        <section className="mt-16">
+          <h2 className="mb-4 text-2xl font-bold">Related EML tools</h2>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <a href="/eml/eml-to-pdf" className="underline">EML to PDF</a>
+            <a href="/eml/eml-to-excel" className="underline">EML to Excel</a>
+            <a href="/eml/open-eml-file" className="underline">Open EML File</a>
+          </div>
+        </section>
       </section>
     </main>
   );
