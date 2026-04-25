@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import PublicUploader from "@/app/components/public-uploader.client";
+import PublicUploader from "../../components/public-uploader.client";
 
 /* ========================= */
 /* TYPES */
@@ -114,7 +114,7 @@ export default function Page({ params }: { params: { slug: string } }) {
             </div>
           </div>
 
-          {/* 🔥 CONVERTER (THIS IS THE MONEY PART) */}
+          {/* 🔥 CONVERTER */}
           <div className="rounded-3xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
             <h2 className="mb-2 text-xl font-bold">
               Upload your EML file
