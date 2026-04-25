@@ -1,19 +1,11 @@
 import { notFound } from "next/navigation";
 import PublicUploader from "../../components/public-uploader.client";
 
-/* ========================= */
-/* TYPES */
-/* ========================= */
-
 type SeoPage = {
   title: string;
   description: string;
   h1: string;
 };
-
-/* ========================= */
-/* PAGE CONFIG */
-/* ========================= */
 
 const pages: Record<string, SeoPage> = {
   "eml-to-pdf": {
@@ -36,8 +28,7 @@ const pages: Record<string, SeoPage> = {
   },
   "outlook-eml-to-pdf": {
     title: "Convert Outlook EML to PDF",
-    description:
-      "Convert Outlook .eml files into clean PDF records instantly.",
+    description: "Convert Outlook .eml files into clean PDF records instantly.",
     h1: "Convert Outlook EML to PDF",
   },
   "email-to-pdf": {
@@ -54,22 +45,36 @@ const pages: Record<string, SeoPage> = {
   },
   "save-eml-as-pdf": {
     title: "Save EML as PDF",
-    description:
-      "Save .eml email files as PDF documents quickly and easily.",
+    description: "Save .eml email files as PDF documents quickly and easily.",
     h1: "Save EML files as PDF",
+  },
+  "open-eml-file": {
+    title: "Open EML Files Online",
+    description:
+      "Open .eml files online and convert them into readable PDF or Excel files.",
+    h1: "Open EML files online",
+  },
+  "eml-viewer": {
+    title: "EML Viewer Online",
+    description:
+      "View and convert .eml email files online without installing Outlook or Thunderbird.",
+    h1: "EML viewer online",
   },
 };
 
-/* ========================= */
-/* STATIC GENERATION */
-/* ========================= */
+type PageProps = {
+  params: Promise<{
+    slug: string;
+  }>;
+};
 
 export function generateStaticParams() {
   return Object.keys(pages).map((slug) => ({ slug }));
 }
 
-export function generateMetadata({ params }: { params: { slug: string } }) {
-  const page = pages[params.slug];
+export async function generateMetadata({ params }: PageProps) {
+  const { slug } = await params;
+  const page = pages[slug];
 
   if (!page) return {};
 
@@ -79,14 +84,11 @@ export function generateMetadata({ params }: { params: { slug: string } }) {
   };
 }
 
-/* ========================= */
-/* PAGE */
-/* ========================= */
+export default async function Page({ params }: PageProps) {
+  const { slug } = await params;
+  const page = pages[slug];
 
-export default function Page({ params }: { params: { slug: string } }) {
-  const page = pages[params.slug];
-
-  if (!page) return notFound();
+  if (!page) notFound();
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
@@ -114,11 +116,8 @@ export default function Page({ params }: { params: { slug: string } }) {
             </div>
           </div>
 
-          {/* 🔥 CONVERTER */}
           <div className="rounded-3xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
-            <h2 className="mb-2 text-xl font-bold">
-              Upload your EML file
-            </h2>
+            <h2 className="mb-2 text-xl font-bold">Upload your EML file</h2>
             <p className="mb-5 text-sm text-slate-600">
               Convert your email file directly on this page.
             </p>
